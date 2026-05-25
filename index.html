@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ИнвентарьQR — Алматинский филиал</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #22263a;
+  --border: #2e334d;
+  --accent: #4ade80;
+  --accent2: #22d3ee;
+  --warn: #fb923c;
+  --danger: #f87171;
+  --text: #e8eaf0;
+  --muted: #6b7280;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); }
+
+/* ── HEADER ── */
+.header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.logo {
+  width: 32px; height: 32px; border: 1.5px solid var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--accent);
+}
+.header-title { font-family: var(--mono); font-size: 15px; letter-spacing: 0.05em; }
+.header-title span { color: var(--accent); }
+.conn-status {
+  margin-left: auto; display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--muted); font-family: var(--mono);
+}
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+.dot.ok { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.dot.warn { background: var(--warn); }
+
+/* ── NAV ── */
+.nav {
+  display: flex; border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.nav-btn {
+  flex: 1; padding: 12px; border: none; background: none;
+  color: var(--muted); font-family: var(--mono); font-size: 12px;
+  letter-spacing: 0.05em; cursor: pointer; border-bottom: 2px solid transparent;
+  transition: color .2s, border-color .2s;
+}
+.nav-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.nav-btn:hover:not(.active) { color: var(--text); }
+
+/* ── MAIN ── */
+.main { max-width: 560px; margin: 0 auto; padding: 24px 16px; }
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 20px; margin-bottom: 16px;
+}
+.card-title {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
+  color: var(--muted); text-transform: uppercase; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-title::before {
+  content: ''; width: 3px; height: 12px; background: var(--accent); border-radius: 2px;
+}
+
+/* ── SCANNER ── */
+#scanner-box {
+  width: 100%; aspect-ratio: 1; background: #000;
+  border-radius: 6px; overflow: hidden; position: relative;
+  border: 1px solid var(--border);
+}
+#reader { width: 100%; height: 100%; }
+.scan-overlay {
+  position: absolute; inset: 0; pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+}
+.scan-frame {
+  width: 55%; height: 55%; position: relative;
+}
+.scan-frame::before, .scan-frame::after,
+.scan-frame > span::before, .scan-frame > span::after {
+  content: ''; position: absolute; width: 20px; height: 20px;
+  border-color: var(--accent); border-style: solid;
+}
+.scan-frame::before { top:0; left:0; border-width: 2px 0 0 2px; }
+.scan-frame::after  { top:0; right:0; border-width: 2px 2px 0 0; }
+.scan-frame > span::before { bottom:0; left:0; border-width: 0 0 2px 2px; }
+.scan-frame > span::after  { bottom:0; right:0; border-width: 0 2px 2px 0; }
+.scan-line {
+  position: absolute; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: scanMove 2s linear infinite;
+}
+@keyframes scanMove { 0%{top:0%} 50%{top:100%} 100%{top:0%} }
+
+.scan-result {
+  margin-top: 12px; padding: 10px 14px;
+  background: var(--surface2); border-radius: 6px;
+  font-family: var(--mono); font-size: 13px;
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--border);
+}
+.scan-result .qr-val { flex: 1; color: var(--accent2); word-break: break-all; }
+
+/* ── FORM ── */
+.form-group { margin-bottom: 14px; }
+label {
+  display: block; font-family: var(--mono); font-size: 11px;
+  letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px;
+}
+input, select, textarea {
+  width: 100%; padding: 10px 14px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); font-family: var(--sans);
+  font-size: 14px; outline: none; transition: border-color .2s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent2);
+}
+select option { background: var(--surface2); }
+.qr-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; background: var(--surface2);
+  border: 1px solid var(--accent2); border-radius: 4px;
+  font-family: var(--mono); font-size: 12px; color: var(--accent2);
+  margin-bottom: 16px;
+}
+
+/* ── BUTTON ── */
+.btn {
+  width: 100%; padding: 13px; border: none; border-radius: 6px;
+  font-family: var(--mono); font-size: 13px; letter-spacing: 0.06em;
+  cursor: pointer; transition: opacity .2s, transform .1s;
+}
+.btn:active { transform: scale(0.98); }
+.btn-primary { background: var(--accent); color: #0f1117; font-weight: 600; }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-outline {
+  background: none; border: 1px solid var(--border);
+  color: var(--text); margin-top: 8px;
+}
+.btn-outline:hover { border-color: var(--muted); }
+.btn-scan {
+  background: none; border: 1px solid var(--accent2);
+  color: var(--accent2); margin-bottom: 16px; padding: 10px;
+  border-radius: 6px; font-family: var(--mono); font-size: 12px;
+  cursor: pointer; width: 100%; letter-spacing: 0.06em;
+  transition: background .2s;
+}
+.btn-scan:hover { background: rgba(34,211,238,0.08); }
+
+/* ── TOAST ── */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 20px; font-family: var(--mono); font-size: 13px;
+  transition: transform .3s ease; z-index: 999; white-space: nowrap;
+  display: flex; align-items: center; gap: 10px;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.success { border-color: var(--accent); color: var(--accent); }
+.toast.error { border-color: var(--danger); color: var(--danger); }
+.toast.loading { border-color: var(--accent2); color: var(--accent2); }
+
+/* ── LIST ── */
+.item-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px; margin-bottom: 10px;
+  cursor: pointer; transition: border-color .2s;
+}
+.item-card:hover { border-color: var(--muted); }
+.item-card.found { border-left: 3px solid var(--accent); }
+.item-card.not-found { border-left: 3px solid var(--danger); }
+.item-num { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.item-name { font-size: 15px; font-weight: 500; margin-bottom: 6px; }
+.item-meta { display: flex; gap: 12px; flex-wrap: wrap; }
+.item-meta span { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 11px; font-family: var(--mono); margin-left: auto;
+}
+.badge-ok { background: rgba(74,222,128,.15); color: var(--accent); border: 1px solid rgba(74,222,128,.3); }
+.badge-miss { background: rgba(248,113,113,.15); color: var(--danger); border: 1px solid rgba(248,113,113,.3); }
+.badge-new { background: rgba(34,211,238,.15); color: var(--accent2); border: 1px solid rgba(34,211,238,.3); }
+
+/* ── SETUP ── */
+.setup-hint {
+  font-size: 13px; color: var(--muted); line-height: 1.7;
+  background: var(--surface2); border-radius: 6px; padding: 14px;
+  border: 1px solid var(--border); margin-bottom: 14px;
+}
+.setup-hint code {
+  font-family: var(--mono); font-size: 12px; color: var(--accent2);
+  background: rgba(34,211,238,.1); padding: 1px 5px; border-radius: 3px;
+}
+.step-list { counter-reset: steps; }
+.step-item {
+  counter-increment: steps; display: flex; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+  font-size: 13px; align-items: flex-start;
+}
+.step-item:last-child { border-bottom: none; }
+.step-item::before {
+  content: counter(steps); min-width: 22px; height: 22px;
+  border-radius: 50%; background: var(--surface2); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 11px; color: var(--accent); flex-shrink: 0;
+}
+
+/* ── DETAIL ── */
+.detail-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px;
+}
+.detail-row:last-child { border-bottom: none; }
+.detail-key { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+.detail-val { font-weight: 500; text-align: right; max-width: 60%; }
+
+/* ── STATS ── */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.stat { background: var(--surface2); border-radius: 6px; padding: 14px; border: 1px solid var(--border); }
+.stat-num { font-family: var(--mono); font-size: 24px; font-weight: 600; }
+.stat-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.stat.green .stat-num { color: var(--accent); }
+.stat.blue .stat-num { color: var(--accent2); }
+.stat.orange .stat-num { color: var(--warn); }
+.stat.red .stat-num { color: var(--danger); }
+
+.empty-state {
+  text-align: center; padding: 40px 20px; color: var(--muted);
+  font-family: var(--mono); font-size: 13px;
+}
+.search-input {
+  margin-bottom: 16px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">ИН</div>
+  <div class="header-title">Инвентарь<span>QR</span></div>
+  <div class="conn-status">
+    <div class="dot" id="conn-dot"></div>
+    <span id="conn-text">не настроено</span>
+  </div>
+</div>
+
+<div class="nav">
+  <button class="nav-btn active" onclick="goTo('scan')">[ СКАН ]</button>
+  <button class="nav-btn" onclick="goTo('list')">[ РЕЕСТР ]</button>
+  <button class="nav-btn" onclick="goTo('setup')">[ НАСТРОЙКИ ]</button>
+</div>
+
+<div class="main">
+
+  <!-- ══ СКАН ══ -->
+  <div class="screen active" id="screen-scan">
+    <div class="card">
+      <div class="card-title">Сканирование QR-кода</div>
+      <div id="scanner-box">
+        <div id="reader"></div>
+        <div class="scan-overlay">
+          <div class="scan-frame">
+            <span></span>
+            <div class="scan-line"></div>
+          </div>
+        </div>
+      </div>
+      <div class="scan-result" id="scan-result" style="display:none">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent2);flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg>
+        <span class="qr-val" id="qr-display"></span>
+        <button onclick="resetScan()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1">×</button>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button class="btn btn-primary" style="flex:1" id="btn-register" onclick="goToRegister()" disabled>Зарегистрировать</button>
+        <button class="btn btn-primary" style="flex:1;background:var(--accent2)" id="btn-check" onclick="goToCheck()" disabled>Проверить</button>
+      </div>
+    </div>
+
+    <!-- Ручной ввод -->
+    <div class="card">
+      <div class="card-title">Ввод вручную</div>
+      <div class="form-group">
+        <label>QR / Инвентарный номер</label>
+        <input type="text" id="manual-qr" placeholder="АФ-2025-ИТ-00001 или любой текст...">
+      </div>
+      <button class="btn btn-outline" onclick="setManualQR()">Применить</button>
+    </div>
+  </div>
+
+  <!-- ══ РЕГИСТРАЦИЯ ══ -->
+  <div class="screen" id="screen-register">
+    <div class="card">
+      <div class="card-title">Регистрация объекта</div>
+      <div class="qr-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span id="reg-qr-display">—</span>
+      </div>
+      <div class="form-group">
+        <label>Название объекта *</label>
+        <input type="text" id="reg-name" placeholder="Ноутбук HP EliteBook 840 G9">
+      </div>
+      <div class="form-group">
+        <label>Филиал *</label>
+        <select id="reg-branch">
+          <option value="">— выбрать —</option>
+          <option>Центральный аппарат</option>
+          <option>Алматинский филиал</option>
+          <option>Актюбинский филиал</option>
+          <option>Астанинский филиал</option>
+          <option>Западно-Казахстанский филиал</option>
+          <option>Кызылординский филиал</option>
+          <option>Павлодарский филиал</option>
+          <option>Карагандинский филиал</option>
+          <option>Мангистауский филиал</option>
+          <option>Южно-Казахстанский филиал</option>
+          <option>Уральский филиал</option>
+          <option>Таразский филиал</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Подразделение *</label>
+        <input type="text" id="reg-dept" placeholder="Введите название подразделения...">
+      </div>
+      <div class="form-group">
+        <label>Бухгалтерский номер *</label>
+        <input type="text" id="reg-accounting" placeholder="ОС-2025-0142">
+      </div>
+      <div class="form-group">
+        <label>Местонахождение (кабинет / этаж)</label>
+        <input type="text" id="reg-location" placeholder="Кабинет 201, этаж 2">
+      </div>
+      <div class="form-group">
+        <label>Ответственное лицо</label>
+        <input type="text" id="reg-person" placeholder="Иванов Иван Иванович">
+      </div>
+      <div class="form-group">
+        <label>Примечание</label>
+        <textarea id="reg-note" rows="2" placeholder="Серийный номер, комплектация..."></textarea>
+      </div>
+      <button class="btn btn-primary" id="btn-save" onclick="saveItem()">Сохранить в базу</button>
+      <button class="btn btn-outline" onclick="goTo('scan')">← Назад</button>
+    </div>
+  </div>
+
+  <!-- ══ ПРОВЕРКА ══ -->
+  <div class="screen" id="screen-check">
+    <div class="card" id="check-card">
+      <div class="card-title">Проверка объекта</div>
+      <div id="check-loading" style="text-align:center;padding:24px;color:var(--muted);font-family:var(--mono);font-size:13px">
+        Поиск в базе...
+      </div>
+      <div id="check-result" style="display:none"></div>
+    </div>
+    <button class="btn btn-outline" onclick="goTo('scan')" style="margin-top:0">← Назад</button>
+  </div>
+
+  <!-- ══ РЕЕСТР ══ -->
+  <div class="screen" id="screen-list">
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat green"><div class="stat-num" id="stat-total">—</div><div class="stat-label">объектов всего</div></div>
+      <div class="stat blue"><div class="stat-num" id="stat-checked">—</div><div class="stat-label">проверено сегодня</div></div>
+      <div class="stat orange"><div class="stat-num" id="stat-branches">—</div><div class="stat-label">филиалов</div></div>
+      <div class="stat red"><div class="stat-num" id="stat-missing">—</div><div class="stat-label">не найдено</div></div>
+    </div>
+    <input type="text" class="search-input" id="list-search" placeholder="Поиск по названию или номеру..." oninput="renderList()">
+    <button class="btn-scan" onclick="loadList()">↻ Обновить из Google Sheets</button>
+    <div id="list-container">
+      <div class="empty-state">Нажмите «Обновить» для загрузки данных</div>
+    </div>
+  </div>
+
+  <!-- ══ НАСТРОЙКИ ══ -->
+  <div class="screen" id="screen-setup">
+    <div class="card">
+      <div class="card-title">Подключение Google Sheets</div>
+      <div class="setup-hint">
+        Вставьте URL вашего <code>Apps Script Web App</code>. Он будет принимать данные и записывать в Google Sheets. Инструкция ниже.
+      </div>
+      <div class="form-group">
+        <label>Apps Script Web App URL</label>
+        <input type="text" id="script-url" placeholder="https://script.google.com/macros/s/...../exec">
+      </div>
+      <button class="btn btn-primary" onclick="saveSettings()">Сохранить</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Как подключить Google Sheets</div>
+      <div class="step-list">
+        <div class="step-item">Откройте Google Sheets → Расширения → Apps Script</div>
+        <div class="step-item">Скопируйте код ниже и вставьте в редактор</div>
+        <div class="step-item">Нажмите «Развернуть» → «Новое развёртывание» → Тип: <code>Веб-приложение</code></div>
+        <div class="step-item">Доступ: <code>Все</code> → Развернуть → Скопировать URL</div>
+        <div class="step-item">Вставьте URL в поле выше и сохраните</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Код для Apps Script</div>
+      <div class="setup-hint" style="font-family:var(--mono);font-size:11px;white-space:pre-wrap;word-break:break-all">const SHEET_NAME = 'Инвентарь';
+
+function doPost(e) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+    sheet.appendRow(['QR-код','Название','Филиал','Подразделение',
+      'Бух.номер','Местонахождение','Ответственный','Примечание',
+      'Дата регистрации','Последняя проверка','Статус']);
+  }
+  const d = JSON.parse(e.postData.contents);
+  if (d.action === 'add') {
+    sheet.appendRow([d.qr,d.name,d.branch,d.dept,d.accounting,
+      d.location,d.person,d.note,d.date,'','Активен']);
+    return ok({added: true});
+  }
+  if (d.action === 'check') {
+    const data = sheet.getDataRange().getValues();
+    for (let i=1;i<data.length;i++) {
+      if (data[i][0] === d.qr) {
+        sheet.getRange(i+1,10).setValue(new Date().toLocaleString('ru'));
+        return ok({found:true,row:data[i]});
+      }
+    }
+    return ok({found:false});
+  }
+  if (d.action === 'list') {
+    const data = sheet.getDataRange().getValues();
+    return ok({rows: data.slice(1)});
+  }
+  return ok({error:'unknown action'});
+}
+
+function doGet(e) { return doPost(e); }
+function ok(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}</div>
+      <button class="btn btn-outline" onclick="copyScript()">Копировать код</button>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──
+let currentQR = '';
+let allItems = [];
+let scanner = null;
+let scannerActive = false;
+
+// ── INIT ──
+window.addEventListener('load', () => {
+  loadSettings();
+  startScanner();
+});
+
+function loadSettings() {
+if (!localStorage.getItem('scriptUrl')) {
+  localStorage.setItem('scriptUrl', 'https://script.google.com/macros/s/AKfycbyeoVQ4IGhFaMa2bKZhT5iBEG7y3oGUTAWCiscJOS0qF87_ws3xD7psCjEfoA0RaLg/exec');
+}
+  const url = localStorage.getItem('scriptUrl') || '';
+  document.getElementById('script-url').value = url;
+  document.getElementById('conn-dot').className = 'dot ' + (url ? 'ok' : 'warn');
+  document.getElementById('conn-text').textContent = url ? 'подключено' : 'не настроено';
+}
+
+function saveSettings() {
+  const url = document.getElementById('script-url').value.trim();
+  localStorage.setItem('scriptUrl', url);
+  loadSettings();
+  toast('Настройки сохранены', 'success');
+}
+
+// ── NAV ──
+function goTo(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  const idx = ['scan','list','setup'].indexOf(name);
+  if (idx >= 0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
+
+  if (name === 'scan') {
+    startScanner();
+  } else {
+    stopScanner();
+  }
+  if (name === 'list') loadList();
+}
+
+// ── SCANNER ──
+function startScanner() {
+  if (scannerActive) return;
+  try {
+    scanner = new Html5Qrcode("reader");
+    scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 220, height: 220 } },
+      (decodedText) => { onScan(decodedText); },
+      () => {}
+    ).then(() => { scannerActive = true; }).catch(() => {});
+  } catch(e) {}
+}
+
+function stopScanner() {
+  if (scanner && scannerActive) {
+    scanner.stop().then(() => { scannerActive = false; }).catch(() => {});
+  }
+}
+
+function onScan(qr) {
+  if (currentQR === qr) return;
+  currentQR = qr;
+  document.getElementById('qr-display').textContent = qr;
+  document.getElementById('scan-result').style.display = 'flex';
+  document.getElementById('btn-register').disabled = false;
+  document.getElementById('btn-check').disabled = false;
+  document.getElementById('reg-qr-display').textContent = qr;
+  // Haptic feedback
+  if (navigator.vibrate) navigator.vibrate(40);
+  toast('QR считан: ' + qr.slice(0,30), 'success');
+}
+
+function resetScan() {
+  currentQR = '';
+  document.getElementById('scan-result').style.display = 'none';
+  document.getElementById('btn-register').disabled = true;
+  document.getElementById('btn-check').disabled = true;
+}
+
+function setManualQR() {
+  const val = document.getElementById('manual-qr').value.trim();
+  if (!val) return;
+  onScan(val);
+}
+
+// ── REGISTER ──
+function goToRegister() {
+  if (!currentQR) return;
+  document.getElementById('reg-qr-display').textContent = currentQR;
+  goTo('register');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+}
+
+async function saveItem() {
+  const url = localStorage.getItem('scriptUrl');
+  if (!url) { toast('Укажите URL в Настройках', 'error'); return; }
+
+  const name = document.getElementById('reg-name').value.trim();
+  const branch = document.getElementById('reg-branch').value;
+  const dept = document.getElementById('reg-dept').value;
+  const accounting = document.getElementById('reg-accounting').value.trim();
+
+  if (!name || !branch || !dept || !accounting) {
+    toast('Заполните обязательные поля', 'error'); return;
+  }
+
+  const payload = {
+    action: 'add',
+    qr: currentQR,
+    name, branch, dept, accounting,
+    location: document.getElementById('reg-location').value.trim(),
+    person: document.getElementById('reg-person').value.trim(),
+    note: document.getElementById('reg-note').value.trim(),
+    date: new Date().toLocaleString('ru')
+  };
+
+  const btn = document.getElementById('btn-save');
+  btn.disabled = true; btn.textContent = 'Сохранение...';
+  toast('Отправка в Google Sheets...', 'loading');
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (json.added) {
+      toast('Объект зарегистрирован ✓', 'success');
+      clearRegForm();
+      setTimeout(() => goTo('scan'), 1200);
+    } else {
+      toast('Ошибка записи', 'error');
+    }
+  } catch(e) {
+    toast('Ошибка соединения', 'error');
+  }
+  btn.disabled = false; btn.textContent = 'Сохранить в базу';
+}
+
+function clearRegForm() {
+  ['reg-name','reg-accounting','reg-location','reg-person','reg-note'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('reg-branch').value = '';
+  document.getElementById('reg-dept').value = '';
+}
+
+// ── CHECK ──
+async function goToCheck() {
+  if (!currentQR) return;
+  goTo('check');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+  const url = localStorage.getItem('scriptUrl');
+  document.getElementById('check-loading').style.display = 'block';
+  document.getElementById('check-result').style.display = 'none';
+
+  if (!url) {
+    showCheckResult(null, 'no-settings');
+    return;
+  }
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'check', qr: currentQR })
+    });
+    const json = await res.json();
+    showCheckResult(json);
+  } catch(e) {
+    showCheckResult(null, 'error');
+  }
+}
+
+function showCheckResult(json, err) {
+  document.getElementById('check-loading').style.display = 'none';
+  const el = document.getElementById('check-result');
+  el.style.display = 'block';
+
+  if (err === 'no-settings') {
+    el.innerHTML = `<div style="color:var(--warn);font-family:var(--mono);font-size:13px;text-align:center;padding:16px">
+      Укажите URL в Настройках</div>`;
+    return;
+  }
+  if (err === 'error') {
+    el.innerHTML = `<div style="color:var(--danger);font-family:var(--mono);font-size:13px;text-align:center;padding:16px">
+      Ошибка соединения</div>`;
+    return;
+  }
+  if (!json.found) {
+    el.innerHTML = `
+      <div style="text-align:center;padding:16px">
+        <div style="font-size:32px;margin-bottom:12px">⚠</div>
+        <div style="color:var(--danger);font-family:var(--mono);font-size:14px;margin-bottom:8px">НЕ НАЙДЕН В БАЗЕ</div>
+        <div style="color:var(--muted);font-size:12px;font-family:var(--mono)">${currentQR}</div>
+        <div style="margin-top:16px;font-size:13px;color:var(--muted)">Объект не зарегистрирован.<br>Нажмите «Зарегистрировать» для добавления.</div>
+      </div>`;
+    return;
+  }
+  const r = json.row;
+  // r: [qr, name, branch, dept, accounting, location, person, note, date_reg, date_check, status]
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <div style="font-size:24px">✓</div>
+      <div>
+        <div style="font-size:16px;font-weight:600">${r[1]}</div>
+        <div style="font-size:12px;color:var(--accent);font-family:var(--mono)">НАЙДЕН В БАЗЕ</div>
+      </div>
+    </div>
+    <div class="detail-row"><span class="detail-key">QR-код</span><span class="detail-val" style="font-family:var(--mono);font-size:11px">${r[0]}</span></div>
+    <div class="detail-row"><span class="detail-key">Филиал</span><span class="detail-val">${r[2]}</span></div>
+    <div class="detail-row"><span class="detail-key">Подразделение</span><span class="detail-val">${r[3]}</span></div>
+    <div class="detail-row"><span class="detail-key">Бух. номер</span><span class="detail-val" style="font-family:var(--mono)">${r[4]}</span></div>
+    <div class="detail-row"><span class="detail-key">Местонахождение</span><span class="detail-val">${r[5] || '—'}</span></div>
+    <div class="detail-row"><span class="detail-key">Ответственный</span><span class="detail-val">${r[6] || '—'}</span></div>
+    <div class="detail-row"><span class="detail-key">Примечание</span><span class="detail-val" style="font-size:12px;color:var(--muted)">${r[7] || '—'}</span></div>
+    <div class="detail-row"><span class="detail-key">Дата регистрации</span><span class="detail-val" style="font-family:var(--mono);font-size:12px">${r[8]}</span></div>
+    <div class="detail-row"><span class="detail-key">Последняя проверка</span><span class="detail-val" style="font-family:var(--mono);font-size:12px;color:var(--accent)">${r[9] || 'впервые сейчас'}</span></div>
+  `;
+}
+
+// ── LIST ──
+async function loadList() {
+  const url = localStorage.getItem('scriptUrl');
+  if (!url) {
+    document.getElementById('list-container').innerHTML =
+      '<div class="empty-state">Настройте подключение в разделе «Настройки»</div>';
+    return;
+  }
+  document.getElementById('list-container').innerHTML =
+    '<div class="empty-state">Загрузка...</div>';
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'list' })
+    });
+    const json = await res.json();
+    allItems = json.rows || [];
+    updateStats();
+    renderList();
+  } catch(e) {
+    document.getElementById('list-container').innerHTML =
+      '<div class="empty-state" style="color:var(--danger)">Ошибка загрузки</div>';
+  }
+}
+
+function updateStats() {
+  const today = new Date().toLocaleDateString('ru');
+  const checkedToday = allItems.filter(r => r[9] && r[9].includes(today)).length;
+  const branches = new Set(allItems.map(r => r[2]).filter(Boolean)).size;
+  const missing = 0; // можно расширить логикой
+  document.getElementById('stat-total').textContent = allItems.length;
+  document.getElementById('stat-checked').textContent = checkedToday;
+  document.getElementById('stat-branches').textContent = branches;
+  document.getElementById('stat-missing').textContent = missing;
+}
+
+function renderList() {
+  const q = document.getElementById('list-search').value.toLowerCase();
+  const filtered = allItems.filter(r =>
+    !q || (r[0]||'').toLowerCase().includes(q) || (r[1]||'').toLowerCase().includes(q)
+  );
+  if (!filtered.length) {
+    document.getElementById('list-container').innerHTML =
+      '<div class="empty-state">Ничего не найдено</div>';
+    return;
+  }
+  const today = new Date().toLocaleDateString('ru');
+  document.getElementById('list-container').innerHTML = filtered.map(r => {
+    const checkedToday = r[9] && r[9].includes(today);
+    const badge = checkedToday
+      ? '<span class="badge badge-ok">проверен</span>'
+      : '<span class="badge badge-new">не проверен</span>';
+    return `<div class="item-card ${checkedToday ? 'found' : ''}">
+      <div style="display:flex;align-items:flex-start">
+        <div style="flex:1">
+          <div class="item-num">${r[0]}</div>
+          <div class="item-name">${r[1]}</div>
+          <div class="item-meta">
+            <span>${r[2]}</span>
+            <span>${r[3]}</span>
+            <span style="font-family:var(--mono)">${r[4]}</span>
+          </div>
+        </div>
+        ${badge}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── COPY SCRIPT ──
+function copyScript() {
+  const code = document.querySelector('.setup-hint').textContent;
+  navigator.clipboard.writeText(code).then(() => toast('Код скопирован', 'success'));
+}
+
+// ── TOAST ──
+let toastTimer;
+function toast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// hide nav for sub-screens
+function goTo(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const navMap = {scan:0, list:1, setup:2};
+  document.querySelectorAll('.nav-btn').forEach((b,i) => {
+    b.classList.toggle('active', i === navMap[name]);
+  });
+  const el = document.getElementById('screen-' + name);
+  if (el) el.classList.add('active');
+
+  if (name === 'scan') startScanner();
+  else stopScanner();
+  if (name === 'list') loadList();
+}
+</script>
+</body>
+</html>
